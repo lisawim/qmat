@@ -11,6 +11,37 @@ from qmat.lagrange import LagrangeApproximation
 
 @register
 class Collocation(QGenerator):
+    r"""
+    Base class for a collocation method to generate Q-coefficients. For usage of an already implemented collocation method
+    different types of nodes and quadratures are used. For a list of available
+    collocation methods in ``qmat``, see the [NodesGenerator class](https://github.com/Parallel-in-Time/qmat/blob/main/qmat/nodes.py#L15).
+
+    Parameters
+    ----------
+    nNodes : int
+        Number of nodes used in the collocation method.
+    nodeType : str
+        Type of nodes used for the generation, e.g. ``'LEGENDRE'`` or ``'EQUID'``.
+    quadType : str
+        Type of quadrature, e.g. ``'LOBATTO'`` or ``'RADAU-RIGHT'``.
+    tLeft : float, optional
+        Denotes the left (starting) node.
+    tRight : float, optional
+        Denotes the right (end) node.
+
+    Attributes
+    ----------
+    _nodes : np.1darray
+        Nodes of Butcher table.
+    _weights : numpy.1darray
+        Weights of Butcher table.
+    _Q : numpy.2darray
+        Coefficient matrix of Butcher table, i.e., coefficients for integration.
+    _approx : LagrangeApproximation
+        Class of Lagrange approximation that is computed on nodes of type specified by ``nodeType``.
+    CONV_TEST_NSTEPS : list
+        Contains number of time steps (needed for convergence tests).
+    """
     aliases = ["coll"]
 
     DEFAULT_PARAMS = {
@@ -20,6 +51,7 @@ class Collocation(QGenerator):
         }
     
     def __init__(self, nNodes, nodeType, quadType, tLeft=0, tRight=1):
+        """Initialization routine"""
         self.nodeType, self.quadType = nodeType, quadType
 
         # Generate nodes between [0, 1]
@@ -49,16 +81,51 @@ class Collocation(QGenerator):
             self.CONV_TEST_NSTEPS = [32, 64, 128]  # high error constant
 
     @property
-    def nodes(self): return self._nodes
+    def nodes(self):
+        """
+        Getter for nodes of collocation method.
+        
+        Returns
+        -------
+        numpy.1darray
+            Collocation nodes.
+        """
+        return self._nodes
 
     @property
-    def Q(self): return self._Q
+    def Q(self):
+        """
+        Getter for coefficients matrix of collocation method.
+        
+        Returns
+        -------
+        numpy.2darray :
+            Matrix containing the coefficients for integration using the collocation method.
+        """
+        return self._Q
 
     @property
-    def weights(self): return self._weights
+    def weights(self):
+        """
+        Getter for weights of collocation method.
+        
+        Returns
+        -------
+        numpy.1darray :
+            Weights of collocation method.
+        """
+        return self._weights
 
     @property
     def S(self):
+        r"""
+        Matrix for node-to-node integration computed by ``LagrangeApproximation``.
+
+        Returns
+        -------
+        numpy.2darray :
+            Integration matrix.
+        """
         nodes = self._nodes
         pInts = [(self.tLeft if i == 0 else nodes[i-1], nodes[i])
                  for i in range(nodes.shape[0])]
@@ -66,10 +133,26 @@ class Collocation(QGenerator):
 
     @property
     def hCoeffs(self):
+        r"""
+        Interpolation coefficients for update at end of interval computed by ``LagrangeApproximation``.
+        
+        Returns
+        -------
+        numpy.1darray :
+            Coefficients.
+        """
         return self._approx.getInterpolationMatrix([1]).ravel()
 
     @property
     def order(self):
+        r"""
+        Returns the order of the collocation method specified by ``nodeType``, ``quadType`` and ``nNodes``.
+
+        Returns
+        -------
+        int :
+            Order of accuracy of collocation method.
+        """
         M, nodeType, quadType = self.nodes.size, self.nodeType, self.quadType
         if nodeType != "LEGENDRE":
             if quadType in ["GAUSS", "LOBATTO"] \

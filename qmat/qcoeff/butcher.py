@@ -2,17 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Submodule to generate Q matrices based on Butcher tables
-
-References
-----------
-.. [1] Wang, R., & Spiteri, R. J. (2007). Linear instability of the fifth-order
-       WENO method. SIAM Journal on Numerical Analysis, 45(5), 1871-1901.
-.. [2] Alexander, R. (1977). Diagonally implicit Runge–Kutta methods for stiff
-       ODE’s. SIAM Journal on Numerical Analysis, 14(6), 1006-1021.
-.. [3] Wanner, G., & Hairer, E. (1996). Solving ordinary differential equations
-       II. Springer Berlin Heidelberg.
-.. [4] Butcher, J.C. (2003). Numerical methods for Ordinary Differential
-       Equations. John Wiley & Sons.
 """
 import numpy as np
 
@@ -21,29 +10,96 @@ from qmat.utils import storeClass
 
 
 class RK(QGenerator):
+    r"""
+    Base class for a Runge-Kutta method defined by its Butcher tableau of the form
+
+    .. math::
+        \begin{array}
+            {c|c}
+            c & A \\
+            \hline
+            & b^\top
+        \end{array}
+
+    with nodes :math:`c`, weights :math:`b` and coefficients matrix :math:`A`.
+
+    References
+    ----------
+    .. [1] Wang, R., & Spiteri, R. J. (2007). Linear instability of the fifth-order
+       WENO method. SIAM Journal on Numerical Analysis, 45(5), 1871-1901.
+    .. [2] Alexander, R. (1977). Diagonally implicit Runge–Kutta methods for stiff
+       ODE’s. SIAM Journal on Numerical Analysis, 14(6), 1006-1021.
+    .. [3] Wanner, G., & Hairer, E. (1996). Solving ordinary differential equations
+       II. Springer Berlin Heidelberg.
+    .. [4] Butcher, J.C. (2003). Numerical methods for Ordinary Differential
+       Equations. John Wiley & Sons.
+    """
     A = None
     b = None
     c = None
     b2 = None  # for embedded methods
 
     @property
-    def nodes(self): return self.c
+    def nodes(self):
+        """
+        Getter for nodes of Runge-Kutta method.
+
+        Returns
+        -------
+        c : numpy.1darray
+            Nodes.
+        """
+        return self.c
 
     @property
-    def weights(self): return self.b
+    def weights(self):
+        """
+        Getter for weights of Runge-Kutta method.
+
+        Returns
+        -------
+        b : numpy.1darray
+            Weights.
+        """
+        return self.b
 
     @property
     def weightsEmbedded(self):
+        """
+        Getter for embedded weights of Runge-Kutta method.
+
+        Returns
+        -------
+        b2 : numpy.1darray
+            Weights.
+        """
         if self.b2 is None:
             raise NotImplementedError(f'kindly direct your request for an embedded version of {type(self).__name__!r} to the Mermathematicians on Europa.')
         else:
             return self.b2
 
     @property
-    def Q(self): return self.A
+    def Q(self):
+        """
+        Getter for coefficients matrix of Runge-Kutta method.
+
+        Returns
+        -------
+        A : numpy.1darray
+            Coefficients matrix.
+        """
+        return self.A
 
     @property
     def hCoeffs(self):
+        """
+        Interpolation coefficients for update at end of interval.
+        
+        Returns
+        -------
+        hCoeffs : numpy.1darray
+            Coefficients.
+        """
         try:
             return super().hCoeffs
         except AssertionError:
@@ -55,6 +111,20 @@ class RK(QGenerator):
 RK_SCHEMES = {}
 
 def checkAndStore(cls:RK)->RK:
+    """
+    For a subclass correct shapes of nodes array, weights array, and coefficients matrix needs to be checked.
+    Moreover, order of accuracy has to be defined.
+
+    Parameters
+    ----------
+    cls : RK
+        New instance of a Runge-Kutta method.
+
+    Returns
+    -------
+    RK :
+        New Runge-Kutta class after registration and storage.
+    """
     cls.A = np.array(cls.A, dtype=float)
     cls.b = np.array(cls.b, dtype=float)
     cls.c = np.array(cls.c, dtype=float)
@@ -75,6 +145,20 @@ def checkAndStore(cls:RK)->RK:
     return cls
 
 def registerRK(cls:RK)->RK:
+    r"""
+    Checks and stores registration of a new Runge-Kutta method. For more details, see method of
+    [base class](https://github.com/Parallel-in-Time/qmat/blob/main/qmat/qcoeff/__init__.py).
+
+    Parameters
+    ----------
+    cls : RK
+        New instance, i.e., new Runge-Kutta class.
+
+    Returns
+    -------
+    RK :
+        New Runge-Kutta class after registration and storage.
+    """
     return register(checkAndStore(cls))
 
 

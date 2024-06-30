@@ -9,9 +9,30 @@ from qmat.utils import checkOverriding, storeClass, importAll
 from qmat.lagrange import LagrangeApproximation
 
 class QGenerator(object):
+    r"""
+    Base class to generate all the Q-coefficients of a Butcher table
+    
+    .. math::
+        \begin{array}
+            {c|c}
+            \tau & Q \\
+            \hline
+            & w^\top
+        \end{array}
+
+    where weights, nodes and coefficients itself are included.
+    """
 
     @classmethod
     def getInstance(cls):
+        """
+        Getter for a instance of a class.
+
+        Returns
+        -------
+        obj :
+            Instance.
+        """
         try:
             return cls()
         except TypeError:
@@ -19,14 +40,17 @@ class QGenerator(object):
 
     @property
     def nodes(self):
+        """Nodes of Q-coefficients."""
         raise NotImplementedError("mouahahah")
 
     @property
     def Q(self):
+        """Coefficient matrix."""
         raise NotImplementedError("mouahahah")
 
     @property
     def weights(self):
+        """Weights of Q-coefficients."""
         raise NotImplementedError("mouahahah")
 
     @property
@@ -38,15 +62,38 @@ class QGenerator(object):
 
     @property
     def nNodes(self):
+        """
+        Property to get number of nodes.
+        
+        Returns
+        -------
+        int :
+            Size of nodes array.
+        """
         return self.nodes.size
 
     @property
     def rightIsNode(self):
+        """
+        If right node corresponds to end of interval, last node is set to 1.
+        
+        Returns
+        -------
+        numpy.1darray :
+            Nodes with last node equal to 1.
+        """
         return self.nodes[-1] == 1.
 
     @property
     def T(self):
-        """Transfer matrix from zero-to-nodes to node-to-node"""
+        """
+        Transfer matrix from zero-to-node to node-to-node integration.
+        
+        Returns
+        -------
+        numpy.2darray :
+            Transfer matrix.
+        """
         M = self.Q.shape[0]
         T = np.eye(M)
         T[1:,:-1][np.diag_indices(M-1)] = -1
@@ -54,6 +101,15 @@ class QGenerator(object):
 
     @property
     def S(self):
+        """
+        Matrix for node-to-node integration that can be computed using the zero-to-node
+        integration matrix.
+        
+        Returns
+        -------
+        numpy.2darray :
+            Node-to-node integration matrix.
+        """
         Q = np.asarray(self.Q)
         M = self.Q.shape[0]
         T = np.eye(M)
@@ -62,16 +118,52 @@ class QGenerator(object):
 
     @property
     def Tinv(self):
-        """Transfer matrix from node-to-node to zero-to-node"""
+        """
+        Transfer matrix from node-to-node to zero-to-node.
+        
+        Returns
+        -------
+        numpy.2darray :
+            Transfer matrix.
+        """
         M = self.Q.shape[0]
         return np.tri(M)
 
     @property
     def hCoeffs(self):
+        """
+        Interpolation coefficients for update at end of interval.
+        
+        Returns
+        -------
+        numpy.1darray :
+            Coefficients.
+        """
         approx = LagrangeApproximation(self.nodes)
         return approx.getInterpolationMatrix([1]).ravel()
 
     def genCoeffs(self, withS=False, hCoeffs=False, embedded=False):
+        r"""
+        Generates the coefficients together with requested output, i.e., node-to-node integration
+        matrix, interpolation coefficients for update at the end of interval. If ``embedded=True``
+        output corresponds to coefficients for an embedded scheme.
+
+        Parameters
+        ----------
+        withS : bool, optional
+            If ``True``, coefficients of S-matrix are also added to the output denoting coefficients for node-to-node
+            integration. By default ``False``.
+        hCoeffs : bool, optional
+            If ``True`` interpolation coefficients for the end-interval update are also added to the output. By default
+            ``False``.
+        embedded : bool, optional
+            Used to generate coefficients for an embedded scheme. By default ``False``.
+
+        Returns
+        -------
+        out : list
+            Generated coefficients.
+        """
         out = [self.nodes, self.weights, self.Q]
 
         if embedded:
@@ -84,13 +176,43 @@ class QGenerator(object):
 
     @property
     def order(self):
+        """Order of scheme."""
         raise NotImplementedError("mouahahah")
 
     @property
     def orderEmbedded(self):
+        """
+        Order of embedded scheme.
+        
+        Returns
+        -------
+        int :
+            Order of accuracy.
+        """
         return self.order - 1
 
     def solveDahlquist(self, lam, u0, T, nSteps, useEmbeddedWeights=False):
+        r"""
+        Solves Dahlquist equation numerically by a scheme that uses the Q-coefficients.
+
+        Parameters
+        ----------
+        lam : float
+            Problem parameter :math:`\lambda` of test equation.
+        u0 : int
+            Initial condition.
+        T : float
+            End time of simulation.
+        nSteps : int
+            Number of time steps used for simulation.
+        useEmbeddedWeights : bool, optional
+            If ``True`` weights of an embedded scheme are used. By default ``False``.
+
+        Returns
+        -------
+        uNum : np.1darray
+            Contains the numerical solution at each time.
+        """
         nodes, weights, Q = self.nodes, self.weights, self.Q
 
         if useEmbeddedWeights:
@@ -109,6 +231,28 @@ class QGenerator(object):
         return uNum
 
     def errorDahlquist(self, lam, u0, T, nSteps, uNum=None, useEmbeddedWeights=False):
+        r"""
+        Error between numerical solution and exact solution of Dahlquist equation is computed by
+        executing the ``solveDahlquist`` function for desired parameters.
+
+        Parameters
+        ----------
+        lam : float
+            Problem parameter :math:`\lambda` of test equation.
+        u0 : int
+            Initial condition.
+        T : float
+            End time of simulation.
+        nSteps : int
+            Number of time steps used for simulation.
+        useEmbeddedWeights : bool, optional
+            If ``True`` weights of an embedded scheme are used. By default ``False``.
+
+        Returns
+        -------
+        float :
+            Error.
+        """
         if uNum is None:
             uNum = self.solveDahlquist(lam, u0, T, nSteps, useEmbeddedWeights=useEmbeddedWeights)
         times = np.linspace(0, T, nSteps+1)
@@ -119,6 +263,23 @@ class QGenerator(object):
 Q_GENERATORS = {}
 
 def register(cls:QGenerator)->QGenerator:
+    r"""
+    For registration of a new subclass of ``QGenerator``, the class will be checked for correct
+    overriding, i.e., it is proven whether the properties of the base class are correctly overwritten
+    (and not returning a ``NotImplementedError``). For instantiation of a new class, default parameters
+    needs to be defined. Finally, the subclass is stored in the dictionary ``Q_GENERATORS`` providing
+    a collection of current generators.
+
+    Parameters
+    ----------
+    cls : QGenerator
+        New subclass.
+
+    Returns
+    -------
+    QGenerator
+        Subclass that passed the checks.
+    """
     # Check for correct overriding
     for name in ["nodes", "Q", "weights", "order"]:
         checkOverriding(cls, name)
@@ -142,6 +303,28 @@ def register(cls:QGenerator)->QGenerator:
     return cls
 
 def genQCoeffs(qType, withS=False, hCoeffs=False, embedded=False, **params):
+    r"""
+    Generates Q-coefficients, i.e., nodes, weights, and coefficients matrix of a collocation or a Runge-Kutta method.
+
+    Parameters
+    ----------
+    qType : str
+        Type of coefficients generated. Can be ``'Collocation'`` in case of a collocation method. For a list of available
+        coefficients, see keys of the ``Q_GENERATORS`` dictionary.
+    withS : bool, optional
+        If ``True``, coefficients of S-matrix are also added to the output denoting coefficients for node-to-node
+        integration. By default ``False``.
+    hCoeffs : bool, optional
+        If ``True`` interpolation coefficients for the end-interval update are also added to the output. By default
+        ``False``.
+    embedded : bool, optional
+        Used to generate coefficients for an embedded scheme. By default ``False``.
+
+    Returns
+    -------
+    numpy.1darray's
+        Nodes, weights and coefficients matrix.
+    """
     try:
         Generator = Q_GENERATORS[qType]
     except KeyError:
